@@ -6,9 +6,8 @@ import{
     createSet,
     createToggle
 } from "./actions";
+import reducer from './reducers';
 import './App.css';
-
-let idSeq = Date.now();
 
 function  bindActionCreators(actionCreators, dispatch) {
     const ret = {};
@@ -29,11 +28,7 @@ const Control = memo(function Control(props) {
         e.preventDefault();
         const newText = inputRef.current.value.trim();
         if (newText.length === 0) return;
-        addTodo({
-            id: ++idSeq,
-            text: newText,
-            complete: false,
-        });
+        addTodo(newText);
         inputRef.current.value = '';
     };
     return <div className="control">
@@ -87,61 +82,42 @@ const Todos = memo(function Todos(props) {
 
 const LS_KEY = '_$-todos_';
 
+let store = {
+    todos: [],
+    incrementCount: 0,
+}
+
 function TodoList() {
     const [todos, setTodos] = useState([]);
     const [incrementCount, setIncrementCount] = useState(0);
-    // const addTodo = useCallback((todo) => {
-    //     setTodos(todos => [...todos, todo]);
-    // }, []);
-    // const removeTodo = useCallback((id) => {
-    //     setTodos(todos => todos.filter(todo => {
-    //         return todo.id != id;
-    //     }));
-    // }, []);
-    // const toggleTodo = useCallback((id) => {
-    //     setTodos(todos => todos.map(todo => {
-    //         return todo.id === id
-    //         ? {
-    //             ...todo,
-    //                 complete: !todo.complete,
-    //             }
-    //         : todo;
-    //     }))
-    // }, []);
-    const dispatch = useCallback((action) => {
-        const { type, payload } = action;
-        switch(type) {
-            case 'set':
-                setTodos(payload);
-                setIncrementCount(c => c + 1);
-                break;
-            case 'add':
-                setTodos(todos => [...todos, payload]);
-                setIncrementCount(c => c + 1);
-                break;
-            case 'remove':
-                setTodos(todos => todos.filter(todo => {
-                    return todo.id != payload;
-                }));
-                break;
-            case 'toggle':
-                setTodos(todos => todos.map(todo => {
-                    return todo.id === payload
-                        ? {
-                            ...todo,
-                            complete: !todo.complete,
-                        }
-                        : todo;
-                }))
-                break;
-            default:
+
+    useEffect(() => {
+        Object.assign(store, {
+            todos,
+            incrementCount,
+        })
+    }, [todos, incrementCount]);
+
+    const dispatch = (action) => {
+        const setters = {
+            todos: setTodos,
+            incrementCount: setIncrementCount
+        };
+        if ('function' === typeof action) {
+            action(dispatch, () => store);
+            return;
         }
-    }, []);
+        const newState = reducer(store, action);
+        for (let key in newState) {
+            setters[key](newState[key]);
+        }
+    };
 
     useEffect(() => {
         const todos = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
         dispatch(createSet(todos));
     }, []);
+
     useEffect(() => {
         localStorage.setItem(LS_KEY, JSON.stringify(todos));
     }, [todos])
